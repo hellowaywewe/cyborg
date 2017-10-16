@@ -20,10 +20,11 @@ Cyborg Generic driver modules implementation.
 from cyborg.accelerator.common import exception
 from cyborg.accelerator.drivers import base
 from oslo_log import log as logging
+from oslo_concurrency import processutils as putils
 
 LOG = logging.getLogger(__name__)
 
-# NOTE (crushil): REQUIRED_PROPERTIES needs to be filled out.
+# TODO(crushil): REQUIRED_PROPERTIES needs to be filled out.
 REQUIRED_PROPERTIES = {}
 COMMON_PROPERTIES = REQUIRED_PROPERTIES
 
@@ -51,6 +52,12 @@ def _parse_driver_info(driver):
 
 class GENERICDRIVER(base.BaseDriver):
 
+    def __init__(self, execute=putils.execute, *args, **kwargs):
+        self.host = kwargs.get('host')
+        self.backend = kwargs.get('backend')
+        self.driver_type = kwargs.get('driver_type')
+        self._execute = execute
+
     def get_properties(self):
         """Return the properties of the generic driver.
 
@@ -58,24 +65,27 @@ class GENERICDRIVER(base.BaseDriver):
         """
         return COMMON_PROPERTIES
 
-    def attach(self):
+    def install_driver(self, driver_type):
 
-            def install(self):
+            def attach_instance(self, instance_id):
                 pass
 
-    def detach(self):
+    def uninstall_driver(self, driver_type):
 
-            def uninstall(self):
+            def detach_instance(self, instance_id):
                 pass
 
             def delete(self):
                 pass
 
-    def discover(self):
+    def discover_driver(self, driver_type):
         pass
 
-    def list(self):
+    def driver_list(self, driver_type):
         pass
 
-    def update(self):
+    def update(self, driver_type):
         pass
+
+    def do_setup(self):
+        self._execute('sudo', './setup.sh')

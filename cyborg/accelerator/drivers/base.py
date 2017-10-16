@@ -26,15 +26,15 @@ class BaseDriver(object):
     Defines the abstract base class for generic and vendor drivers.
     """
 
-    standard_interfaces = ('discover', 'list', 'update', 'attach', 'detach')
+    standard_interfaces = ('discover_driver', 'driver_list', 'update', 'install_driver', 'uninstall_driver')
 
-    discover = None
+    discover_driver = None
     """`Standard` attribute for discovering drivers.
 
     A reference to an instance of :class:DiscoverInterface.
     """
 
-    list = None
+    driver_list = None
     """`Core` attribute for listing drivers.
 
     A reference to an instance of :class:ListInterface.
@@ -46,13 +46,13 @@ class BaseDriver(object):
     A reference to an instance of :class:UpdateInterface.
     """
 
-    attach = None
+    install_driver = None
     """`Standard` attribute to attach accelerator to an instance.
 
     A reference to an instance of :class:AttachInterface.
     """
 
-    detach = None
+    uninstall_driver = None
     """`Standard` attribute to detach accelerator to an instance.
 
     A reference to an instance of :class:AttachInterface.
