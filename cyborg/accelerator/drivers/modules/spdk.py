@@ -2,86 +2,98 @@
 Cyborg SPDK driver modules implementation.
 """
 
+import socket
+
 from cyborg.accelerator.commom import exception
-from cyborg.accelerator.drivers import base
+from cyborg.accelerator.drivers.modules import generic
 from oslo_log import lof as logging
 from oslo_config import cfg
 from oslo_concurrency import processutils as putils
+from cyborg.common.i18n import _
+from cyborg.accelerator import configuration
+from cyborg.db.sqlalchemy import api
+from cyborg.accelerator.accelerator import accelerator
 
 LOG = logging.getLogger(__name__)
 
-libtype_opt = cfg.ListOpt('libtype',
-                          defalut=['local', 'nvmf', 'iscsi', 'vhost'],
-                          help=_('List of libtype to enable by default'))
+accelerator_opts = [
+    cfg.StrOpt('spdk_conf_file',
+               default='/etc/cyborg/spdk.conf',
+               help=_('SPDK conf file to use for the SPDK driver in Cyborg;')),
 
-rpc_opts = [
-    cfg.BoolOpt('Enable',
+    cfg.StrOpt('device_type',
+               default='NVMe',
+               help=_('Default backend device type: NVMe')),
+
+    cfg.IntOpt('queue',
+               default=8,
+               help=_('Default number of queues')),
+
+    cfg.IntOpt('iops',
+               default=1000,
+               help=_('Default number of iops')),
+
+    cfg.IntOpt('bandwidth:',
+               default=800,
+               help=_('Default bandwidth')),
+
+    cfg.BoolOpt('remoteable:',
                 default=False,
-                help=_('Default is disabled')),
+                help=_('remoteable is false by default'))
 
-    cfg.StrOpt('bind_host',
-               defalut='127.0.0.1',
-               help=_('Listen 127.0.0.1'))
-]
-
-malloc_opts = [
-    cfg.IntOpt('NumberOfLuns',
-                default=8,
-                help=_('Malloc Luns')),
-
-    cfg.IntOpt('LunSizeInMB',
-                efalut=64,
-                help=_('Each LUN will be size 64MB'))
-]
-
-nvme_opts = [
-    cfg.ListOpt('TransportId',
-                default=['trtype:PCIe traddr:0000:00:00.0',
-                         'trtype:PCIe traddr:0000:01:00.0']),
-
-    cfg.ListOpt('NvmeName',
-                default=['Nvme0', 'Nvme1']),
-
-    cfg.IntOpt('AdminPollRate',
-                default=100000,
-                help=_('Units in microseconds'))
 ]
 
 CONF = cfg.CONF
-CONF.register_opt(libtype_opt)
-CONF.register_opts(rpc_opts)
-CONF.register_opts(malloc_opts)
-CONF.register_opts(nvme_opts)
+CONF.register_opts(accelerator_opts, group=configuration.SHARED_CONF_GROUP)
 
-print(CONF.Nv)
-class SPDKDRIVER(base.BaseDriver):
+try:
+    import py_spdk
+except ImportError:
+    py_spdk = None
+
+class SPDKDRIVER(generic.GENERICDRIVER):
 
     def __init__(self, execute=putils.execute, *args, **kwargs):
         super(SPDKDRIVER, self).__init__(execute, *args, **kwargs)
+        self.configuration.append_config_values(accelerator_opts)
+        self.hostname = socket.gethostname()
+        self.driver_type = self.configuration.safe_get('accelerator_backend_name') or 'SPDK'
+        self.device_type = self.configuration.safe_get('device_type')
+        self.dbconn = api.get_backend()
 
-    def install_driver(self, driver_type):
-        self.check_driver(driver_type)
+    def initialize_connection(self, accelerator, connector):
+        return py_spdk.initialize_connection(accelerator, connector)
+
+    def validate_connection(self, connector):
+        return py_spdk.initialize_connection(connector)
+
+    def destory_db(self):
+        if self.dbconn is not None:
+            self.dbconn.close()
+
+    def discover_driver(self, driver_type):
+        values = {'acc_type': self.driver_type}
+        self.dbconn.accelerator_create(None, values)
+
+
+    def install_driver(self, driver_id, driver_type):
+        self.do_setup()
         ctrlr = self.get_controller()
         nsid = self.get_allocated_nsid(ctrlr)
         self.attach_instance(nsid)
         pass
 
     def uninstall_driver(self, driver_type):
-        self.check_driver(driver_type)
         ctrlr = self.get_controller()
         nsid = self.get_allocated_nsid(ctrlr)
         self.detach_instance(nsid)
         pass
 
-    def discover_driver(self, driver_type):
-        pass
 
     def driver_list(self, driver_type):
-        self.check_driver(driver_type)
-        self.display_controller_list()
+        return self.dbconn.accelerator_query(None, driver_type)
 
     def update(self, driver_type):
-        self.check_driver(driver_type)
         pass
 
     def attach_instance(self, instance_id):
@@ -124,9 +136,4 @@ class SPDKDRIVER(base.BaseDriver):
     def get_allocated_nsid(self, ctrl):
         return self.nsid
 
-    def check_driver(self, driver_type):
-        if driver_type is 'SPDK':
-            return True
-        else:
-            return False
 

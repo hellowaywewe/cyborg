@@ -21,8 +21,22 @@ from cyborg.accelerator.common import exception
 from cyborg.accelerator.drivers import base
 from oslo_log import log as logging
 from oslo_concurrency import processutils as putils
+from oslo_config import cfg
+from cyborg.accelerator import configuration
 
 LOG = logging.getLogger(__name__)
+
+accelerator_opts = [
+    cfg.StrOpt('accelerator_backend_name',
+               help=_('The backend name for a given driver implementation')),
+
+    cfg.StrOpt('accelerator_dir',
+               defalut='$state_path/accelerators',
+               help=_('accelerator configuration file storage directory'))
+]
+
+CONF = cfg.CONF
+CONF.register_opts(accelerator_opts, group=configuration.SHARED_CONF_GROUP)
 
 # TODO(crushil): REQUIRED_PROPERTIES needs to be filled out.
 REQUIRED_PROPERTIES = {}
@@ -54,9 +68,14 @@ class GENERICDRIVER(base.BaseDriver):
 
     def __init__(self, execute=putils.execute, *args, **kwargs):
         self.host = kwargs.get('host')
-        self.backend = kwargs.get('backend')
-        self.driver_type = kwargs.get('driver_type')
+        self.db = kwargs.get('db')
         self._execute = execute
+        self.configuration = kwargs.get('configuration', None)
+        if self.configuration:
+            self.configuration.append_config_values(accelerator_opts)
+
+    def initialize_connection(self, accelerator, connector):
+        pass
 
     def get_properties(self):
         """Return the properties of the generic driver.
@@ -65,10 +84,13 @@ class GENERICDRIVER(base.BaseDriver):
         """
         return COMMON_PROPERTIES
 
-    def install_driver(self, driver_type):
+    def install_driver(self, driver_id, driver_type):
 
             def attach_instance(self, instance_id):
                 pass
+
+    def validate_connection(self, connector):
+        pass
 
     def uninstall_driver(self, driver_type):
 

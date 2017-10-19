@@ -34,3 +34,4 @@ class accelerator(Base):
         self.remoteable = kwargs['remoteable']
         self.vendor_id = kwargs['vendor_id']
         self.product_id = kwargs['product_id']
+        self.acc_type = kwargs['acc_type']
